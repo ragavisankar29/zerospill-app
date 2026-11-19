@@ -1,13 +1,13 @@
 import os
 import io
+import json
 import socket
 import random
 import time
 import sqlite3
-import smtplib
+import urllib.request
+import urllib.error
 from datetime import datetime
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
@@ -21,17 +21,17 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 app = Flask(__name__)
-app.secret_key = 'zerospill_production_secret_key'
+app.secret_key = os.environ.get('SECRET_KEY', 'zerospill_production_secret_key')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(BASE_DIR, 'data', 'ZEROSPILL_cleaned.csv')
 DB_PATH = os.path.join(BASE_DIR, 'zerospill.db')
 
 # =========================================================
-# GMAIL SMTP SETTINGS
+# BREVO HTTP EMAIL API SETTINGS (Loaded from Render Env)
 # =========================================================
-SENDER_EMAIL = "s.ragavi213@gmail.com"
-SENDER_APP_PASSWORD = "cdcq sftk pvak rttg"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "s.ragavi213@gmail.com").strip()
 
 OTP_STORE = {}
 PAYMENT_SESSIONS = {}
@@ -54,33 +54,47 @@ def get_local_ip():
         return "127.0.0.1"
 
 def send_real_otp_email(recipient_email, otp_code, purpose="Verification"):
-    if "your_gmail" in SENDER_EMAIL or "your_16_char" in SENDER_APP_PASSWORD:
-        print(f"\n[DEMO MODE] OTP for {recipient_email}: {otp_code}\n")
+    if not BREVO_API_KEY:
+        print(f"[EMAIL ERROR] BREVO_API_KEY is not set in environment variables.")
         return False
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"ZeroSpill {purpose} OTP: {otp_code}"
-        msg["From"] = f"ZeroSpill Food Rescue <{SENDER_EMAIL}>"
-        msg["To"] = recipient_email
-
-        html = f"""
-        <div style="font-family:Arial,sans-serif;max-width:460px;margin:auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;">
-            <h2 style="color:#065f46;margin:0 0 10px;">🌱 ZeroSpill Verification</h2>
-            <p style="color:#334155;font-size:14px;">Your 6-digit OTP for <strong>{purpose}</strong> is:</p>
-            <div style="background:#ecfdf5;border:1px solid #10b981;padding:14px;text-align:center;border-radius:8px;margin:16px 0;">
-                <span style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#047857;">{otp_code}</span>
-            </div>
-            <p style="color:#64748b;font-size:12px;">Valid for 5 minutes. Do not share this code.</p>
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:460px;margin:auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px;">
+        <h2 style="color:#065f46;margin:0 0 10px;">🌱 ZeroSpill Verification</h2>
+        <p style="color:#334155;font-size:14px;">Your 6-digit OTP for <strong>{purpose}</strong> is:</p>
+        <div style="background:#ecfdf5;border:1px solid #10b981;padding:14px;text-align:center;border-radius:8px;margin:16px 0;">
+            <span style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#047857;">{otp_code}</span>
         </div>
-        """
-        msg.attach(MIMEText(html, "html"))
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
-            server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
-        return True
+        <p style="color:#64748b;font-size:12px;">Valid for 5 minutes. Do not share this code.</p>
+    </div>
+    """
+
+    payload = {
+        "sender": {"name": "ZeroSpill Food Rescue", "email": SENDER_EMAIL},
+        "to": [{"email": recipient_email}],
+        "subject": f"ZeroSpill {purpose} OTP: {otp_code}",
+        "htmlContent": html
+    }
+
+    req = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return response.status in (200, 201, 202)
+    except urllib.error.HTTPError as e:
+        print(f"[BREVO HTTP ERROR] {e.code}: {e.read().decode('utf-8', errors='ignore')}")
+        return False
     except Exception as e:
-        print(f"[SMTP ERROR] {e}")
+        print(f"[BREVO ERROR] {e}")
         return False
 
 # =========================================================
@@ -470,9 +484,9 @@ def register():
         sent = send_real_otp_email(email, otp_code, "Account Registration")
         session['verify_email'] = email
         if sent:
-            flash(f"Verification OTP sent to your email ({email}). Please check your inbox.", "success")
+            flash(f"Verification OTP sent to {email}. Please check your inbox.", "success")
         else:
-            flash(f"OTP generated! (Demo OTP: {otp_code})", "info")
+            flash("Could not send verification email right now. Please try again in a moment.", "danger")
         return redirect(url_for('verify_otp'))
 
     return render_template('register.html')
@@ -513,7 +527,7 @@ def login():
         if sent:
             flash(f"Security OTP sent to {email}.", "success")
         else:
-            flash(f"Login OTP generated! (Demo OTP: {otp_code})", "info")
+            flash("Could not send verification email right now. Please try again in a moment.", "danger")
         return redirect(url_for('verify_otp'))
 
     return render_template('login.html')
