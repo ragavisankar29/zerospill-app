@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroSpill - Turning Surplus into Support</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body style="background: #f8fafc; min-height: 100vh; display: flex; flex-direction: column;">
+
+  <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background: {% if session.get('role') == 'Admin' %}#0f172a{% else %}#065f46{% endif %};">
+    <div class="container">
+      <a class="navbar-brand fw-bold d-flex align-items-center" href="{% if session.get('role') == 'Admin' %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('user_dashboard') }}{% endif %}">
+        🌱 ZeroSpill 
+        {% if session.get('role') == 'Admin' %}
+          <span class="badge bg-danger ms-2" style="font-size: 0.7rem;">ADMIN PORTAL</span>
+        {% else %}
+          <span class="badge bg-success ms-2" style="font-size: 0.7rem;">FOOD RESCUE</span>
+        {% endif %}
+      </a>
+      
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navMenu">
+        <ul class="navbar-nav ms-auto align-items-center">
+          {% if session.get('user') %}
+            {% if session.get('role') == 'Admin' %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Home</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('schema_view') }}">Schemas</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('olap_view') }}">3D OLAP Cube</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('patterns_view') }}">Pattern Mining</a></li>
+            {% else %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('user_dashboard') }}">Home</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('food') }}">Available Food</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('nearby') }}">Nearby Hubs</a></li>
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('requests_view') }}">My Orders</a></li>
+              <li class="nav-item ms-lg-2">
+                <a class="btn btn-warning btn-sm fw-bold text-dark position-relative px-3" href="{{ url_for('view_cart') }}">
+                  🛒 Cart
+                  {% if session.get('cart') %}
+                    <span class="badge bg-danger ms-1">{{ session.get('cart')|length }}</span>
+                  {% endif %}
+                </a>
+              </li>
+            {% endif %}
+            
+            <li class="nav-item ms-lg-3 mt-2 mt-lg-0">
+              <span class="badge bg-secondary me-2">{{ session.get('user') }}</span>
+              <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">Logout</a>
+            </li>
+          {% else %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+            <li class="nav-item"><a class="btn btn-sm btn-light ms-2 text-success fw-bold" href="{{ url_for('register') }}">Register</a></li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          <div class="alert alert-{{ cat }} alert-dismissible fade show small" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <main class="flex-grow-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="py-3 text-center text-muted small mt-auto border-top bg-white">
+    ZeroSpill © 2026 — Multidimensional Data Warehouse & Banquet Food Rescue Platform
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

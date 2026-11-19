@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ZeroSpill Payment Request</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body style="background: #0f172a; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px;">
+
+  <div class="card border-0 shadow-lg p-4 text-center" style="max-width: 400px; width: 100%; border-radius: 20px;">
+    <div class="mb-2">
+      <span class="badge bg-success-subtle text-success fw-bold px-3 py-2 rounded-pill">🔔 PAYMENT NOTIFICATION</span>
+    </div>
+
+    <h4 class="fw-bold text-dark mt-2">ZeroSpill Food Rescue</h4>
+    <p class="text-muted small mb-3">Payment request from <strong>{{ pay.user_name }}</strong>'s session</p>
+
+    <div class="bg-light rounded-4 p-3 mb-4 border">
+      <div class="text-muted small">Amount to Authorize</div>
+      <div class="display-5 fw-bold text-success my-1">₹{{ pay.amount }}</div>
+      <div class="small text-secondary">{{ pay.cart|length }} item(s) • UPI QR Checkout</div>
+    </div>
+
+    {% if done_state == 'COMPLETED' %}
+      <div class="alert alert-success fw-bold py-3 rounded-3">
+        ✅ Payment Completed!<br>
+        <span class="small fw-normal">Your laptop screen is now proceeding to order confirmation...</span>
+      </div>
+    {% elif done_state == 'DECLINED' %}
+      <div class="alert alert-danger fw-bold py-3 rounded-3">
+        ❌ Payment Declined!<br>
+        <span class="small fw-normal">Your laptop screen has returned to the cart page.</span>
+      </div>
+    {% else %}
+      <form method="POST" action="{{ url_for('mobile_pay', pay_token=pay_token) }}">
+        <button type="submit" name="decision" value="complete" class="btn btn-success w-100 py-3 fw-bold fs-6 mb-2" style="border-radius: 12px;">
+          ✓ Complete the Process (Pay ₹{{ pay.amount }})
+        </button>
+        <button type="submit" name="decision" value="decline" class="btn btn-outline-danger w-100 py-2 fw-bold" style="border-radius: 12px;">
+          ✕ Decline
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
+</body>
+</html>

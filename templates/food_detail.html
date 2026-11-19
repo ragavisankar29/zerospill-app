@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4" style="max-width: 850px;">
+  <a href="{{ url_for('food') }}" class="btn btn-sm btn-outline-secondary mb-3 fw-bold">← Back to Nearby Food & Supplies</a>
+
+  <div class="card border-0 shadow-sm overflow-hidden" style="border-radius: 18px;">
+    <div class="row g-0">
+      <div class="col-md-5" style="position: relative; min-height: 300px;">
+        <img src="{{ item.Image_URL }}" alt="{{ item.Food_Item }}" style="width: 100%; height: 100%; object-fit: cover;">
+        {% if item.Limited_Stock %}
+          <span class="badge bg-warning text-dark fw-bold position-absolute top-0 start-0 m-3 px-3 py-2 shadow">⚡ LIMITED STOCK</span>
+        {% else %}
+          <span class="badge bg-success text-white fw-bold position-absolute top-0 start-0 m-3 px-3 py-2 shadow">✓ FRESHLY AVAILABLE</span>
+        {% endif %}
+      </div>
+
+      <div class="col-md-7 p-4 d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <span class="badge bg-success-subtle text-success fw-bold">{{ item.Food_Category }}</span>
+          <span class="badge bg-light text-dark border">★ {{ item.Rating }} • {{ item.Delivery_Time }}</span>
+        </div>
+
+        <h2 class="fw-bold text-dark mt-1 mb-1">{{ item.Food_Item }}</h2>
+        <p class="text-success fw-semibold small mb-2">
+          🏨 {{ item.Venue_Name }} • 📍 {{ item.Area }}
+        </p>
+
+        <p class="text-muted small mb-3">{{ item.Description }}</p>
+
+        <form method="POST" action="{{ url_for('add_to_cart') }}" class="mt-auto">
+          <input type="hidden" name="food_item" value="{{ item.Food_Item }}">
+          <input type="hidden" id="selectedQty" name="quantity" value="{{ item.Pricing_Options[1].qty }}">
+          <input type="hidden" id="selectedPrice" name="item_price" value="{{ item.Pricing_Options[1].price }}">
+          <input type="hidden" id="selectedLabel" name="pack_label" value="{{ item.Pricing_Options[1].label }}">
+
+          <label class="form-label small fw-bold text-dark mb-2">Select Quantity / Pack Size:</label>
+          <div class="row g-2 mb-4">
+            {% for opt in item.Pricing_Options %}
+            <div class="col-6">
+              <div class="border rounded-3 p-2 price-tier {% if loop.index0 == 1 %}border-success bg-success-subtle{% endif %}" 
+                   style="cursor: pointer;"
+                   onclick="selectTier(this, {{ opt.qty }}, {{ opt.price }}, '{{ opt.label }}')">
+                <div class="small fw-bold text-dark">{{ opt.label }}</div>
+                <div class="fw-bold text-success">₹{{ opt.price }}</div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 10px;">
+            🛒 Add to Cart (<span id="btnPrice">₹{{ item.Pricing_Options[1].price }}</span>) →
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function selectTier(el, qty, price, label) {
+  document.querySelectorAll(".price-tier").forEach(box => {
+    box.classList.remove("border-success", "bg-success-subtle");
+  });
+  el.classList.add("border-success", "bg-success-subtle");
+  document.getElementById("selectedQty").value = qty;
+  document.getElementById("selectedPrice").value = price;
+  document.getElementById("selectedLabel").value = label;
+  document.getElementById("btnPrice").innerText = "₹" + price;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4" style="max-width: 960px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <span class="badge bg-success mb-1">SECURE CHECKOUT</span>
+      <h2 class="fw-bold text-dark mb-0">🛒 Your Food Rescue Cart</h2>
+    </div>
+    <a href="{{ url_for('food') }}" class="btn btn-outline-success btn-sm fw-bold">+ Add More Items</a>
+  </div>
+
+  <!-- Live Decline Notification Banner (Hidden until declined on phone) -->
+  <div id="declineAlert" class="alert alert-danger fw-bold shadow-sm mb-4" style="display: none;">
+    ❌ Payment was declined on the scanned device! You are back on your cart page — you can try scanning again or choose another payment method.
+  </div>
+
+  {% if not cart %}
+    <div class="card border-0 shadow-sm p-5 text-center" style="border-radius: 16px;">
+      <div style="font-size: 3rem;">🛒</div>
+      <h4 class="fw-bold text-dark mt-2">Your cart is empty</h4>
+      <p class="text-muted small">Browse surplus dishes, banana leaves, vazhai thaar, and eco-supplies to add them here.</p>
+      <a href="{{ url_for('food') }}" class="btn btn-success mx-auto mt-2 px-4 fw-bold">Browse Available Food</a>
+    </div>
+  {% else %}
+    <div class="row g-4">
+      <!-- Left: Cart Items List -->
+      <div class="col-lg-7">
+        <div class="card border-0 shadow-sm p-3" style="border-radius: 16px;">
+          <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">Selected Items ({{ cart|length }})</h5>
+          {% for item in cart %}
+          <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-3">
+            <div class="d-flex align-items-center gap-3">
+              <img src="{{ item.image }}" alt="{{ item.food_item }}" style="width: 68px; height: 68px; object-fit: cover; border-radius: 10px;">
+              <div>
+                <h6 class="fw-bold text-dark mb-0">{{ item.food_item }}</h6>
+                <div class="text-muted small">{{ item.venue }} • 📍 {{ item.area }}</div>
+                <span class="badge bg-success-subtle text-success mt-1">{{ item.pack_label }} × {{ item.count }}</span>
+              </div>
+            </div>
+            <div class="text-end">
+              <div class="fw-bold text-dark fs-6 mb-1">₹{{ item.subtotal }}</div>
+              <form method="POST" action="{{ url_for('remove_from_cart', item_id=item.id) }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.75rem;">Remove</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Right: Bill Summary & Interactive QR Payment -->
+      <div class="col-lg-5">
+        <div class="card border-0 shadow-sm p-4" style="border-radius: 16px;">
+          <h5 class="fw-bold text-dark mb-3">Bill & Payment Details</h5>
+
+          <div class="bg-light p-3 rounded-3 mb-3 small">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-muted">Items Subtotal:</span>
+              <span class="fw-bold text-dark">₹{{ subtotal }}</span>
+            </div>
+            <div class="d-flex justify-content-between mb-1">
+              <span class="text-muted">Delivery Fee (Free above ₹250):</span>
+              <span class="fw-bold text-success">{% if delivery_fee == 0 %}FREE (₹0){% else %}₹{{ delivery_fee }}{% endif %}</span>
+            </div>
+            <hr class="my-2">
+            <div class="d-flex justify-content-between fs-5">
+              <span class="fw-bold text-dark">To Pay:</span>
+              <span class="fw-bold text-success">₹{{ grand_total }}</span>
+            </div>
+          </div>
+
+          <form method="POST" action="{{ url_for('checkout') }}">
+            <div class="mb-3">
+              <label class="form-label small fw-bold text-secondary">Fulfillment Mode</label>
+              <select name="delivery_mode" class="form-select form-select-sm">
+                <option value="Doorstep Delivery">Doorstep Delivery (To My Locked GPS)</option>
+                <option value="Self Pickup">Self Pickup from Hotel / Wedding Hall</option>
+              </select>
+            </div>
+
+            <label class="form-label small fw-bold text-secondary">Select Payment Method</label>
+            <div class="mb-3">
+              <div class="form-check border rounded p-2 mb-2">
+                <input class="form-check-input ms-1" type="radio" name="payment_method" id="payUpi" value="UPI QR Verified" checked onclick="togglePayBox('upi')">
+                <label class="form-check-label ms-2 fw-bold small" for="payUpi">
+                  📱 Scan QR Code with Phone (Interactive Approval)
+                </label>
+              </div>
+              <div class="form-check border rounded p-2 mb-2">
+                <input class="form-check-input ms-1" type="radio" name="payment_method" id="payCard" value="Credit / Debit Card" onclick="togglePayBox('card')">
+                <label class="form-check-label ms-2 fw-bold small" for="payCard">
+                  💳 Credit / Debit Card
+                </label>
+              </div>
+              <div class="form-check border rounded p-2">
+                <input class="form-check-input ms-1" type="radio" name="payment_method" id="payCod" value="Cash on Delivery / Pickup" onclick="togglePayBox('cod')">
+                <label class="form-check-label ms-2 fw-bold small" for="payCod">
+                  💵 Cash on Delivery / Pay at Pickup
+                </label>
+              </div>
+            </div>
+
+            <!-- Interactive QR Code Box -->
+            <div id="upiBox" class="text-center border rounded-3 p-3 mb-3 bg-light">
+              <div id="qrStatusBadge" class="badge bg-warning text-dark mb-2">⏳ Waiting for Phone Scan...</div>
+              <div class="small fw-bold text-dark mb-1">Scan this QR with your phone camera to pay ₹{{ grand_total }}</div>
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data={{ scan_url | urlencode }}" 
+                   alt="Scan to Pay QR" class="img-thumbnail my-2">
+              <div class="text-muted" style="font-size: 0.72rem;">
+                Ensure phone & laptop are on the same Wi-Fi/Hotspot.<br>
+                Or <a href="{{ scan_url }}" target="_blank" class="fw-bold text-success">open simulator link</a> to test.
+              </div>
+            </div>
+
+            <!-- Card Input Box -->
+            <div id="cardBox" class="border rounded-3 p-3 mb-3 bg-light" style="display: none;">
+              <input type="text" class="form-control form-control-sm mb-2" placeholder="Card Number (XXXX XXXX XXXX XXXX)">
+              <div class="row g-2">
+                <div class="col-6"><input type="text" class="form-control form-control-sm" placeholder="MM/YY"></div>
+                <div class="col-6"><input type="password" class="form-control form-control-sm" placeholder="CVV"></div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-success w-100 py-2 fw-bold" style="border-radius: 10px;">
+              Confirm & Pay ₹{{ grand_total }} →
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function togglePayBox(type) {
+  document.getElementById("upiBox").style.display = (type === "upi") ? "block" : "none";
+  document.getElementById("cardBox").style.display = (type === "card") ? "block" : "none";
+}
+
+// Poll every 2 seconds to check if the user scanned the QR and tapped Complete or Decline on their phone
+{% if cart and pay_token %}
+const payToken = "{{ pay_token }}";
+const pollTimer = setInterval(() => {
+  fetch(`/api/check-payment/${payToken}`)
+    .then(res => res.json())
+    .then(data => {
+      const badge = document.getElementById("qrStatusBadge");
+      if (data.status === "SCANNED") {
+        badge.className = "badge bg-info text-dark mb-2";
+        badge.innerText = "📱 Phone Connected! Waiting for confirmation...";
+      } else if (data.status === "COMPLETED") {
+        clearInterval(pollTimer);
+        badge.className = "badge bg-success text-white mb-2";
+        badge.innerText = "✅ Approved on Phone! Redirecting...";
+        window.location.href = "{{ url_for('requests_view') }}";
+      } else if (data.status === "DECLINED") {
+        clearInterval(pollTimer);
+        badge.className = "badge bg-danger text-white mb-2";
+        badge.innerText = "❌ Declined on Phone";
+        document.getElementById("declineAlert").style.display = "block";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    });
+}, 2000);
+{% endif %}
+</script>
+{% endblock %}

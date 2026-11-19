@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4">
+  <div class="p-4 mb-4 rounded-3 shadow-sm text-white" style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%);">
+    <div class="container-fluid py-2">
+      <span class="badge bg-white text-success fw-bold px-3 py-1 mb-2">USER COMMUNITY PORTAL</span>
+      <h1 class="display-6 fw-bold">Welcome, {{ user }}!</h1>
+      <p class="col-md-8 fs-6 mb-2">Request available surplus banquet food, locate nearby collection centers, and help prevent food waste.</p>
+      {% if location %}
+        <div class="small bg-dark bg-opacity-25 p-2 rounded d-inline-block">
+          📍 <strong>Your Locked GPS Location:</strong> {{ location }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Live Community Impact KPIs -->
+  {% if stats %}
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 border-start border-success border-4">
+        <span class="text-muted small fw-bold">LIVE AVAILABLE SURPLUS</span>
+        <h3 class="fw-bold text-success mt-1 mb-0">{{ stats.available_surplus }}</h3>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 border-start border-primary border-4">
+        <span class="text-muted small fw-bold">CLAIMED BY COMMUNITY</span>
+        <h3 class="fw-bold text-primary mt-1 mb-0">{{ stats.claimed_by_community }}</h3>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 border-start border-warning border-4">
+        <span class="text-muted small fw-bold">MY ACTIVE ORDERS</span>
+        <h3 class="fw-bold text-dark mt-1 mb-0">{{ stats.my_active_orders }}</h3>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 text-center h-100">
+        <div style="font-size: 2.2rem;">🍲</div>
+        <h5 class="fw-bold mt-2">Browse Surplus Food</h5>
+        <p class="text-muted small">Explore freshly logged surplus food from ongoing banquets and dining venues.</p>
+        <a href="{{ url_for('food') }}" class="btn btn-success btn-sm mt-auto fw-bold">View Available Food</a>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 text-center h-100">
+        <div style="font-size: 2.2rem;">📍</div>
+        <h5 class="fw-bold mt-2">Nearby Collection Hubs</h5>
+        <p class="text-muted small">Find the nearest banquet halls, venues, and distribution centers close to your GPS location.</p>
+        <a href="{{ url_for('nearby') }}" class="btn btn-success btn-sm mt-auto fw-bold">Locate Hubs</a>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card p-3 shadow-sm border-0 text-center h-100">
+        <div style="font-size: 2.2rem;">📦</div>
+        <h5 class="fw-bold mt-2">Track My Requests</h5>
+        <p class="text-muted small">Check the real-time fulfillment status of your food requests and pickup codes.</p>
+        <a href="{{ url_for('requests_view') }}" class="btn btn-outline-success btn-sm mt-auto fw-bold">My Requests</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+      <span class="badge bg-primary mb-1">REAL-TIME TRACKER</span>
+      <h2 class="fw-bold text-dark mb-0">My Food Orders & Live Status</h2>
+      <p class="text-muted small mb-0">Status updates automatically in real time when the Banquet Admin processes your request.</p>
+    </div>
+    <a href="{{ url_for('food') }}" class="btn btn-success btn-sm fw-bold">+ Order More Food</a>
+  </div>
+
+  {% if not orders %}
+    <div class="card border-0 shadow-sm p-5 text-center" style="border-radius: 16px;">
+      <div style="font-size: 2.8rem;">🍽️</div>
+      <h5 class="fw-bold text-dark mt-2">No active orders yet</h5>
+      <p class="text-muted small">Browse available food and supplies to place your first rescue order.</p>
+      <a href="{{ url_for('food') }}" class="btn btn-success btn-sm mx-auto px-4 fw-bold">Browse Food</a>
+    </div>
+  {% else %}
+    <div class="row g-3" id="userOrdersGrid">
+      {% for o in orders %}
+      {% set pct = 20 %}
+      {% set bar_color = 'bg-success' %}
+      {% set badge_color = 'bg-dark' %}
+      {% if o.status == 'Approved' %}{% set pct = 45 %}{% endif %}
+      {% if o.status == 'Preparing' %}{% set pct = 70 %}{% endif %}
+      {% if o.status == 'Ready' %}{% set pct = 90 %}{% endif %}
+      {% if o.status == 'Delivered' %}
+        {% set pct = 100 %}
+        {% set bar_color = 'bg-success' %}
+        {% set badge_color = 'bg-success' %}
+      {% endif %}
+      {% if o.status == 'Cancelled' %}
+        {% set pct = 100 %}
+        {% set bar_color = 'bg-danger' %}
+        {% set badge_color = 'bg-danger' %}
+      {% endif %}
+
+      <div class="col-md-6 user-order-card" data-id="{{ o.order_id }}" data-status="{{ o.status }}" data-item="{{ o.food_item }}">
+        <div class="card border-0 shadow-sm p-3 h-100" style="border-radius: 14px;">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold text-primary small">{{ o.order_id }}</span>
+            <span class="badge {{ badge_color }} order-badge">● {{ o.status }}</span>
+          </div>
+
+          <h5 class="fw-bold text-dark mb-1">
+            {{ o.food_item }} <span class="text-muted fw-normal fs-6">({{ o.quantity_kg }} kg/pack)</span>
+          </h5>
+
+          <div class="text-muted small mb-1">
+            📍 <strong>Hub/Delivery:</strong> {{ o.pickup_hub }}
+          </div>
+          <div class="small mb-3">
+            <span class="fw-bold text-success">₹{{ (o.total_price or 0) | int }}</span>
+            <span class="badge bg-light text-dark border ms-1">{{ o.payment_method or 'UPI Verified' }}</span>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress mb-2" style="height: 8px; border-radius: 6px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated {{ bar_color }} order-bar"
+                 role="progressbar" style="width: {{ pct }}%;"></div>
+          </div>
+
+          {% if o.status == 'Cancelled' %}
+            <div class="text-danger small fw-bold text-center">❌ This order was cancelled by the venue/admin.</div>
+          {% else %}
+            <div class="d-flex justify-content-between text-muted" style="font-size: 0.72rem;">
+              <span>Pending</span>
+              <span>Approved</span>
+              <span>Preparing</span>
+              <span>Ready</span>
+              <span>Delivered</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Clean Floating Delivery / Cancellation Popup (Never locks/greys out screen) -->
+<div id="statusPopupOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+  <div class="card border-0 shadow-lg text-center p-4 bg-white" style="max-width: 420px; width: 100%; border-radius: 20px;">
+    <div id="popupIcon" style="font-size: 3.5rem;">🎉</div>
+    <h3 class="fw-bold mt-2" id="popupTitle">Delivered Successfully!</h3>
+    <p class="text-muted small mb-4" id="popupMessage">Your order has been delivered.</p>
+    <a href="{{ url_for('user_dashboard') }}" class="btn btn-success fw-bold px-4 py-2 mx-auto" style="border-radius: 10px;">
+      Back to Home →
+    </a>
+  </div>
+</div>
+
+<script>
+const statusMap = {
+  'Pending': { pct: 20, bar: 'bg-success', badge: 'bg-dark' },
+  'Approved': { pct: 45, bar: 'bg-success', badge: 'bg-dark' },
+  'Preparing': { pct: 70, bar: 'bg-success', badge: 'bg-dark' },
+  'Ready': { pct: 90, bar: 'bg-success', badge: 'bg-dark' },
+  'Delivered': { pct: 100, bar: 'bg-success', badge: 'bg-success' },
+  'Cancelled': { pct: 100, bar: 'bg-danger', badge: 'bg-danger' }
+};
+
+const notifiedKey = "zerospill_notified_orders_v2";
+let notifiedOrders = JSON.parse(localStorage.getItem(notifiedKey) || "{}");
+let isPopupOpen = false;
+
+function showOrderPopup(orderId, foodItem, status) {
+  const signature = `${orderId}_${status}`;
+  if (notifiedOrders[signature] || isPopupOpen) return;
+
+  notifiedOrders[signature] = true;
+  localStorage.setItem(notifiedKey, JSON.stringify(notifiedOrders));
+  isPopupOpen = true;
+
+  const icon = document.getElementById("popupIcon");
+  const title = document.getElementById("popupTitle");
+  const msg = document.getElementById("popupMessage");
+
+  if (status === "Delivered") {
+    icon.innerText = "🎉";
+    title.className = "fw-bold text-success mt-2";
+    title.innerText = "Delivered Successfully!";
+    msg.innerHTML = `Your order <strong>${orderId}</strong> (<strong>${foodItem}</strong>) has been delivered. Thank you for rescuing surplus food!`;
+  } else if (status === "Cancelled") {
+    icon.innerText = "❌";
+    title.className = "fw-bold text-danger mt-2";
+    title.innerText = "Order Cancelled";
+    msg.innerHTML = `Your order <strong>${orderId}</strong> (<strong>${foodItem}</strong>) was cancelled. Any online payment will be refunded automatically.`;
+  }
+
+  document.getElementById("statusPopupOverlay").style.display = "flex";
+}
+
+// Mark already-completed historical orders on first visit so old orders don't pop up repeatedly;
+// only newly changed orders trigger the popup!
+window.addEventListener("DOMContentLoaded", () => {
+  const cards = document.querySelectorAll(".user-order-card");
+  cards.forEach((card, idx) => {
+    const st = card.dataset.status;
+    const sig = `${card.dataset.id}_${st}`;
+    if ((st === "Delivered" || st === "Cancelled") && !notifiedOrders[sig]) {
+      if (idx === 0) {
+        // Show popup for the latest order if not yet seen
+        showOrderPopup(card.dataset.id, card.dataset.item, st);
+      } else {
+        notifiedOrders[sig] = true;
+      }
+    }
+  });
+  localStorage.setItem(notifiedKey, JSON.stringify(notifiedOrders));
+});
+
+// Live poll every 2.5 seconds for Admin status updates
+setInterval(() => {
+  fetch("{{ url_for('api_live_orders') }}")
+    .then(res => res.json())
+    .then(orders => {
+      orders.forEach(o => {
+        const card = document.querySelector(`.user-order-card[data-id="${o.order_id}"]`);
+        if (card) {
+          const oldStatus = card.dataset.status;
+          if (oldStatus !== o.status) {
+            card.dataset.status = o.status;
+            const cfg = statusMap[o.status] || statusMap['Pending'];
+            const badge = card.querySelector(".order-badge");
+            const bar = card.querySelector(".order-bar");
+
+            badge.className = `badge ${cfg.badge} order-badge`;
+            badge.innerText = `● ${o.status}`;
+            bar.className = `progress-bar progress-bar-striped progress-bar-animated ${cfg.bar} order-bar`;
+            bar.style.width = cfg.pct + "%";
+
+            if (o.status === "Delivered" || o.status === "Cancelled") {
+              showOrderPopup(o.order_id, o.food_item, o.status);
+            }
+          }
+        }
+      });
+    });
+}, 2500);
+</script>
+{% endblock %}

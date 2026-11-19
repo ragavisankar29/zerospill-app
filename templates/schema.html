@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head" style="margin-bottom: 24px;">
+  <div>
+    <span class="eyebrow" style="color: #10b981; font-weight: 700; font-size: 0.8rem; letter-spacing: 1px;">DATA WAREHOUSE MODELING</span>
+    <h1 style="margin: 6px 0; font-size: 1.8rem; font-weight: 800; color: #1e293b;">Star & Snowflake Schema</h1>
+    <p style="color: #64748b; margin: 0;"><code>Fact_Food_Surplus</code> is the central grain connecting multidimensional food rescue records.</p>
+  </div>
+</div>
+
+<!-- Tab Controls to switch schemas -->
+<div style="display: flex; gap: 10px; margin-bottom: 18px;">
+  <button id="btnStar" onclick="switchSchema('star')" style="background: #10b981; color: #ffffff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+    ⭐ Star Schema View
+  </button>
+  <button id="btnSnowflake" onclick="switchSchema('snowflake')" style="background: #e2e8f0; color: #475569; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+    ❄️ Snowflake Schema View (3NF)
+  </button>
+</div>
+
+<!-- Interactive SVG Schema Canvas -->
+<div style="background: #0f172a; border-radius: 12px; padding: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow-x: auto;">
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 8px 12px 8px; border-bottom: 1px solid #334155;">
+    <span id="schemaLabel" style="color: #38bdf8; font-weight: 700; font-size: 0.95rem;">⭐ Star Schema (Fact_Food_Surplus Centric)</span>
+    <span style="color: #94a3b8; font-size: 0.8rem;">Yellow = [PK] | Blue = [FK] | Green = [M] Measures</span>
+  </div>
+  <svg id="schemaSvg" width="1120" height="660" style="display: block; margin: 12px auto 0 auto;"></svg>
+</div>
+
+<!-- Comparative Architecture Breakdown for the Professor -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 24px;">
+  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+    <h3 style="margin-top: 0; color: #059669; font-size: 1.1rem; font-weight: 700;">⭐ Star Schema Architecture</h3>
+    <p style="color: #64748b; font-size: 0.88rem; line-height: 1.5; margin-bottom: 8px;">
+      Centralized <code>Fact_Food_Surplus</code> surrounded by completely denormalized dimension tables. 
+    </p>
+    <ul style="color: #475569; font-size: 0.85rem; padding-left: 20px; line-height: 1.5; margin: 0;">
+      <li><strong>Direct Joins:</strong> Every dimension is exactly 1 join away from the fact table.</li>
+      <li><strong>Query Speed:</strong> Optimized for rapid OLAP roll-up queries and slice/dice operations.</li>
+      <li><strong>Tradeoff:</strong> High data redundancy in categorical columns (e.g., repeating <code>Food_Category</code>).</li>
+    </ul>
+  </div>
+
+  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+    <h3 style="margin-top: 0; color: #0284c7; font-size: 1.1rem; font-weight: 700;">❄️ Snowflake Schema Architecture</h3>
+    <p style="color: #64748b; font-size: 0.88rem; line-height: 1.5; margin-bottom: 8px;">
+      Normalizes dimensions into Third Normal Form (3NF) by decomposing hierarchies into child tables.
+    </p>
+    <ul style="color: #475569; font-size: 0.85rem; padding-left: 20px; line-height: 1.5; margin: 0;">
+      <li><strong>Normalized Levels:</strong> <code>Dim_Food</code> joins to <code>Dim_Food_Category</code>; <code>Dim_Date</code> joins to <code>Dim_Month</code>.</li>
+      <li><strong>Storage Optimization:</strong> Eliminates repeating text strings and update anomalies.</li>
+      <li><strong>Tradeoff:</strong> Analytical queries require complex multi-table joins.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const schemaData = {
+  star: {
+    label: "⭐ Star Schema: 1 Fact Table + 7 Denormalized Dimensions",
+    fact: {
+      name: "Fact_Food_Surplus", x: 430, y: 200, w: 260, h: 260,
+      columns: [
+        "[PK] Surplus_Fact_ID : INT",
+        "[FK] Event_Key : INT",
+        "[FK] Food_Key : INT",
+        "[FK] Date_Key : INT",
+        "[FK] Venue_Key : INT",
+        "[FK] Business_Key : INT",
+        "[FK] Weather_Key : INT",
+        "[FK] Inventory_Key : INT",
+        "[M] Quantity_Prepared : FLOAT",
+        "[M] Quantity_Consumed : FLOAT",
+        "[M] Surplus_Quantity : FLOAT",
+        "[M] Waste_Quantity : FLOAT",
+        "[M] Remaining_Stock : FLOAT",
+        "[M] Daily_Demand : FLOAT"
+      ]
+    },
+    dimensions: [
+      { name: "Dim_Event", x: 40, y: 30, w: 220, h: 140, cols: ["[PK] Event_Key : INT", "Event_ID : VARCHAR", "Event_Type : VARCHAR", "Expected_Guests : INT", "Actual_Guests : INT"] },
+      { name: "Dim_Food", x: 450, y: 25, w: 220, h: 110, cols: ["[PK] Food_Key : INT", "Food_Item : VARCHAR", "Food_Category : VARCHAR"] },
+      { name: "Dim_Date", x: 860, y: 30, w: 220, h: 150, cols: ["[PK] Date_Key : INT", "Date : DATE", "Day : INT", "Month : INT", "Year : INT", "Weekday : VARCHAR"] },
+      { name: "Dim_Venue", x: 40, y: 260, w: 200, h: 90, cols: ["[PK] Venue_Key : INT", "Venue_ID : VARCHAR"] },
+      { name: "Dim_Business", x: 860, y: 260, w: 220, h: 110, cols: ["[PK] Business_Key : INT", "Business_Type : VARCHAR", "Promotion : VARCHAR"] },
+      { name: "Dim_Weather", x: 90, y: 480, w: 240, h: 120, cols: ["[PK] Weather_Key : INT", "Weather : VARCHAR", "Storage_Temperature : FLOAT"] },
+      { name: "Dim_Inventory", x: 790, y: 480, w: 240, h: 120, cols: ["[PK] Inventory_Key : INT", "Inventory_ID : VARCHAR", "Shelf_Life_Days : INT"] }
+    ]
+  },
+  snowflake: {
+    label: "❄️ Snowflake Schema: 3NF Normalized Dimensions with Sub-tables",
+    fact: {
+      name: "Fact_Food_Surplus", x: 430, y: 210, w: 260, h: 250,
+      columns: [
+        "[PK] Surplus_Fact_ID : INT",
+        "[FK] Event_Key : INT",
+        "[FK] Food_Key : INT",
+        "[FK] Date_Key : INT",
+        "[FK] Venue_Key : INT",
+        "[FK] Business_Key : INT",
+        "[FK] Weather_Key : INT",
+        "[FK] Inventory_Key : INT",
+        "[M] Quantity_Prepared : FLOAT",
+        "[M] Quantity_Consumed : FLOAT",
+        "[M] Surplus_Quantity : FLOAT",
+        "[M] Waste_Quantity : FLOAT"
+      ]
+    },
+    dimensions: [
+      { name: "Dim_Event", x: 50, y: 40, w: 200, h: 120, cols: ["[PK] Event_Key : INT", "[FK] Event_Type_ID : INT", "Expected_Guests : INT", "Actual_Guests : INT"] },
+      { name: "Dim_Event_Type (3NF)", x: 50, y: 200, w: 190, h: 80, cols: ["[PK] Event_Type_ID : INT", "Event_Type : VARCHAR"], subOf: "Dim_Event" },
+      { name: "Dim_Food", x: 450, y: 30, w: 220, h: 90, cols: ["[PK] Food_Key : INT", "Food_Item : VARCHAR", "[FK] Category_ID : INT"] },
+      { name: "Dim_Food_Category (3NF)", x: 740, y: 30, w: 210, h: 80, cols: ["[PK] Category_ID : INT", "Food_Category : VARCHAR"], subOf: "Dim_Food" },
+      { name: "Dim_Date", x: 860, y: 160, w: 200, h: 110, cols: ["[PK] Date_Key : INT", "Date : DATE", "Day : INT", "[FK] Month_Key : INT"] },
+      { name: "Dim_Month (3NF)", x: 860, y: 310, w: 190, h: 90, cols: ["[PK] Month_Key : INT", "Month : INT", "Year : INT"], subOf: "Dim_Date" },
+      { name: "Dim_Venue", x: 50, y: 330, w: 190, h: 80, cols: ["[PK] Venue_Key : INT", "Venue_ID : VARCHAR"] },
+      { name: "Dim_Business", x: 860, y: 440, w: 210, h: 100, cols: ["[PK] Business_Key : INT", "Business_Type : VARCHAR"] },
+      { name: "Dim_Weather", x: 90, y: 490, w: 230, h: 100, cols: ["[PK] Weather_Key : INT", "Weather : VARCHAR", "Storage_Temp : FLOAT"] },
+      { name: "Dim_Inventory", x: 480, y: 510, w: 220, h: 100, cols: ["[PK] Inventory_Key : INT", "Inventory_ID : VARCHAR", "Shelf_Life_Days : INT"] }
+    ]
+  }
+};
+
+function renderSchema(type) {
+  const svg = document.getElementById("schemaSvg");
+  svg.innerHTML = "";
+  const data = schemaData[type];
+  document.getElementById("schemaLabel").textContent = data.label;
+
+  // Draw relationship lines
+  data.dimensions.forEach(dim => {
+    let targetX = data.fact.x + data.fact.w / 2;
+    let targetY = data.fact.y + data.fact.h / 2;
+    if (dim.subOf) {
+      const parent = data.dimensions.find(d => d.name === dim.subOf);
+      targetX = parent.x + parent.w / 2;
+      targetY = parent.y + parent.h / 2;
+    }
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", dim.x + dim.w / 2);
+    line.setAttribute("y1", dim.y + dim.h / 2);
+    line.setAttribute("x2", targetX);
+    line.setAttribute("y2", targetY);
+    line.setAttribute("stroke", dim.subOf ? "#c084fc" : "#38bdf8");
+    line.setAttribute("stroke-width", "2");
+    if (dim.subOf) line.setAttribute("stroke-dasharray", "4,4");
+    svg.appendChild(line);
+  });
+
+  function drawTable(tbl, isFact, isSub) {
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+    const header = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    header.setAttribute("x", tbl.x); 
+    header.setAttribute("y", tbl.y);
+    header.setAttribute("width", tbl.w); 
+    header.setAttribute("height", "26");
+    header.setAttribute("fill", isFact ? "#dc2626" : isSub ? "#7c3aed" : "#0284c7");
+    header.setAttribute("rx", "5");
+    g.appendChild(header);
+
+    const body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    body.setAttribute("x", tbl.x); 
+    body.setAttribute("y", tbl.y + 22);
+    body.setAttribute("width", tbl.w); 
+    body.setAttribute("height", tbl.h - 22);
+    body.setAttribute("fill", "#1e293b");
+    body.setAttribute("stroke", isFact ? "#ef4444" : isSub ? "#a855f7" : "#0ea5e9");
+    body.setAttribute("stroke-width", "1.5");
+    body.setAttribute("rx", "5");
+    g.appendChild(body);
+
+    const title = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    title.setAttribute("x", tbl.x + tbl.w / 2); 
+    title.setAttribute("y", tbl.y + 17);
+    title.setAttribute("text-anchor", "middle");
+    title.setAttribute("fill", "#ffffff");
+    title.setAttribute("font-size", "11");
+    title.setAttribute("font-weight", "bold");
+    title.textContent = tbl.name;
+    g.appendChild(title);
+
+    tbl.cols.forEach((col, idx) => {
+      const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      txt.setAttribute("x", tbl.x + 8);
+      txt.setAttribute("y", tbl.y + 40 + (idx * 15));
+      txt.setAttribute("font-size", "10");
+      txt.setAttribute("font-family", "monospace");
+      txt.setAttribute("fill", col.includes("[PK]") ? "#facc15" : col.includes("[FK]") ? "#38bdf8" : col.includes("[M]") ? "#4ade80" : "#cbd5e1");
+      txt.textContent = col;
+      g.appendChild(txt);
+    });
+
+    svg.appendChild(g);
+  }
+
+  drawTable({ ...data.fact, cols: data.fact.columns }, true, false);
+  data.dimensions.forEach(dim => drawTable(dim, false, !!dim.subOf));
+}
+
+function switchSchema(type) {
+  const btnStar = document.getElementById("btnStar");
+  const btnSnowflake = document.getElementById("btnSnowflake");
+  if (type === 'star') {
+    btnStar.style.background = "#10b981";
+    btnStar.style.color = "#ffffff";
+    btnSnowflake.style.background = "#e2e8f0";
+    btnSnowflake.style.color = "#475569";
+  } else {
+    btnSnowflake.style.background = "#0284c7";
+    btnSnowflake.style.color = "#ffffff";
+    btnStar.style.background = "#e2e8f0";
+    btnStar.style.color = "#475569";
+  }
+  renderSchema(type);
+}
+
+document.addEventListener("DOMContentLoaded", () => renderSchema('star'));
+</script>
+{% endblock %}

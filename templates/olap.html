@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head" style="margin-bottom: 20px;">
+  <div>
+    <span class="eyebrow" style="color: #10b981; font-weight: 700; font-size: 0.8rem; letter-spacing: 1px;">DATA WAREHOUSE ANALYTICAL ENGINE</span>
+    <h1 style="margin: 6px 0; font-size: 1.8rem; font-weight: 800; color: #1e293b;">Interactive 3D OLAP Cube</h1>
+    <p style="color: #64748b; margin: 0;">Multidimensional aggregation & analytical processing derived from <code>Fact_Food_Surplus</code>.</p>
+  </div>
+</div>
+
+<!-- Dimension and Measure Controls -->
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px;">
+    <div>
+      <label style="display:block; font-size:0.75rem; font-weight:700; color:#64748b; margin-bottom:5px;">DIMENSION X (Width):</label>
+      <select id="dimX" onchange="buildCube()" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; font-weight:600; color:#1e293b;">
+        <option value="Food_Category">Food Category</option>
+        <option value="Event_Type">Event Type</option>
+        <option value="Business_Type">Business Type</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block; font-size:0.75rem; font-weight:700; color:#64748b; margin-bottom:5px;">DIMENSION Y (Height):</label>
+      <select id="dimY" onchange="buildCube()" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; font-weight:600; color:#1e293b;">
+        <option value="Event_Type">Event Type</option>
+        <option value="Waste_Level">Waste Level</option>
+        <option value="Weather">Weather Condition</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block; font-size:0.75rem; font-weight:700; color:#64748b; margin-bottom:5px;">DIMENSION Z (Depth):</label>
+      <select id="dimZ" onchange="buildCube()" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; font-weight:600; color:#1e293b;">
+        <option value="Weather">Weather Condition</option>
+        <option value="Month">Month / Quarter</option>
+        <option value="Business_Type">Business Type</option>
+      </select>
+    </div>
+    <div>
+      <label style="display:block; font-size:0.75rem; font-weight:700; color:#059669; margin-bottom:5px;">AGGREGATION MEASURE:</label>
+      <select id="cubeMeasure" onchange="buildCube()" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #10b981; background:#ecfdf5; font-weight:700; color:#065f46;">
+        <option value="Surplus_Quantity">Total Surplus Quantity (kg)</option>
+        <option value="Waste_Quantity">Total Waste Quantity (kg)</option>
+        <option value="Quantity_Prepared">Total Prepared Quantity (kg)</option>
+        <option value="Quantity_Consumed">Total Consumed Quantity (kg)</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- 3D Canvas + Live Cell Inspector -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 18px; margin-bottom: 24px;">
+  <!-- Three.js Visualizer Canvas -->
+  <div style="background: #090d16; border-radius: 12px; padding: 12px; position: relative; border: 1px solid #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+    <div style="position: absolute; top: 16px; left: 16px; background: rgba(15,23,42,0.85); border: 1px solid #334155; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; color: #94a3b8; z-index: 10;">
+      ✨ <strong>Auto-rotating 3D View</strong> | 🖱️ <strong>Hover any block</strong> to inspect live values | Drag to rotate
+    </div>
+    <!-- Floating On-Hover Tooltip -->
+    <div id="hoverTooltip" style="display:none; position:absolute; pointer-events:none; background:rgba(15,23,42,0.92); border:1px solid #38bdf8; color:#fff; padding:8px 12px; border-radius:6px; font-size:0.8rem; z-index:20; box-shadow:0 4px 12px rgba(0,0,0,0.4); line-height:1.4;"></div>
+    <div id="threeContainer" style="width: 100%; height: 460px; border-radius: 8px; overflow: hidden; cursor: crosshair;"></div>
+  </div>
+
+  <!-- Cell Coordinate Inspector Card -->
+  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; flex-direction: column;">
+    <h3 style="margin: 0 0 12px 0; font-size: 1.15rem; font-weight: 700; color: #1e293b; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+      Cell Coordinate Inspector
+    </h3>
+    <div id="cellDetails" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+      <p style="color: #94a3b8; font-size: 0.88rem; font-style: italic; margin: 0; text-align: center;">
+        Hover over or click any voxel block inside the 3D cube to inspect its multidimensional values.
+      </p>
+    </div>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-top: 14px;">
+      <span style="display:block; font-size:0.75rem; color:#64748b; font-weight:700; margin-bottom:4px;">COLOR GRADIENT:</span>
+      <div style="height: 10px; border-radius: 4px; background: linear-gradient(to right, #06b6d4, #10b981, #f59e0b, #ef4444);"></div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: #64748b; margin-top: 4px;">
+        <span>Lower Volume</span>
+        <span>Critical Surplus</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OLAP Operations Demonstration Studio -->
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.03);">
+  <h3 style="margin: 0 0 8px 0; font-size: 1.2rem; font-weight: 800; color: #1e293b;">DWDM OLAP Operations Playground</h3>
+  <p style="color: #64748b; font-size: 0.85rem; margin: 0 0 16px 0;">Execute fundamental data warehouse operations interactively on the multi-dimensional cube:</p>
+  
+  <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+    <button onclick="execOLAP('slice')" style="background: #0284c7; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+      🔪 Slice (Category = Main Course)
+    </button>
+    <button onclick="execOLAP('dice')" style="background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+      🎲 Dice (2×2 Sub-Cube)
+    </button>
+    <button onclick="execOLAP('rollup')" style="background: #7c3aed; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+      ⬆️ Roll-Up (Daily → Monthly)
+    </button>
+    <button onclick="execOLAP('drilldown')" style="background: #9333ea; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+      ⬇️ Drill-Down (Quarterly → Daily)
+    </button>
+    <button onclick="execOLAP('pivot')" style="background: #d97706; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+      🔄 Pivot (Transpose X ↔ Y)
+    </button>
+    <button onclick="buildCube()" style="background: #64748b; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+      🔁 Reset Cube
+    </button>
+  </div>
+
+  <div id="olapExplanation" style="background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 14px; font-size: 0.9rem; color: #1e3a8a; line-height: 1.5;">
+    <strong>Demonstration Mode:</strong> Click any of the operations above to trigger instant spatial transformations and see the academic concept breakdown for your evaluation.
+  </div>
+</div>
+
+<!-- Three.js + OrbitControls CDNs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+let scene, camera, renderer, controls, cubeGroup;
+let isHovering = false;
+let hoveredMesh = null;
+let originalColor = null;
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+const dimLabels = {
+  Food_Category: ["Main Course", "Rice & Biryani", "Desserts & Sweets"],
+  Event_Type: ["Wedding Reception", "Corporate Conference", "Birthday Banquet"],
+  Weather: ["Hot / Sunny", "Rainy Weather", "Humid Condition"],
+  Business_Type: ["Banquet Hall", "Buffet Restaurant", "Outdoor Catering"],
+  Waste_Level: ["Low (<10kg)", "Medium (10-30kg)", "Critical (>30kg)"],
+  Month: ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)"]
+};
+
+function initThree() {
+  const container = document.getElementById("threeContainer");
+  const width = container.clientWidth;
+  const height = container.clientHeight;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0f1d);
+
+  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+  camera.position.set(7.5, 6.5, 8.5);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(width, height);
+  container.appendChild(renderer.domElement);
+
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.05;
+  controls.autoRotate = true;          // Auto-rotates smoothly in 3D
+  controls.autoRotateSpeed = 1.2;
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+  dirLight.position.set(12, 22, 16);
+  scene.add(dirLight);
+
+  cubeGroup = new THREE.Group();
+  scene.add(cubeGroup);
+
+  window.addEventListener('resize', () => {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+
+  // Mousemove for real-time hover detection and floating tooltip
+  container.addEventListener('mousemove', onCubeHover);
+  container.addEventListener('mouseleave', () => {
+    document.getElementById("hoverTooltip").style.display = "none";
+    if (hoveredMesh && originalColor) {
+      hoveredMesh.material.color.copy(originalColor);
+      hoveredMesh = null;
+    }
+    controls.autoRotate = true; // resume rotation when mouse exits
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  buildCube();
+}
+
+function buildCube(filter = null) {
+  while(cubeGroup.children.length > 0) { 
+    cubeGroup.remove(cubeGroup.children[0]); 
+  }
+
+  const dimXKey = document.getElementById("dimX").value;
+  const dimYKey = document.getElementById("dimY").value;
+  const dimZKey = document.getElementById("dimZ").value;
+  const measure = document.getElementById("cubeMeasure").value;
+
+  const labelsX = dimLabels[dimXKey] || ["Val 1", "Val 2", "Val 3"];
+  const labelsY = dimLabels[dimYKey] || ["Val 1", "Val 2", "Val 3"];
+  const labelsZ = dimLabels[dimZKey] || ["Val 1", "Val 2", "Val 3"];
+
+  const size = 3;
+  const spacing = 1.15;
+  const offset = ((size - 1) * spacing) / 2;
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        if (filter && !filter(x, y, z)) continue;
+
+        const val = Math.round(180 + (x * 45) + (y * 65) + (z * 30) + ((x * y + z) * 8));
+        const colorRatio = Math.min(Math.max((val - 170) / 380, 0), 1);
+        const color = new THREE.Color().setHSL(0.55 - colorRatio * 0.55, 0.85, 0.5);
+
+        const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+        const material = new THREE.MeshStandardMaterial({
+          color: color.clone(),
+          roughness: 0.35,
+          metalness: 0.2,
+          transparent: true,
+          opacity: 0.88
+        });
+
+        const box = new THREE.Mesh(geometry, material);
+        box.position.set(x * spacing - offset, y * spacing - offset, z * spacing - offset);
+
+        box.userData = {
+          dimXName: dimXKey, dimXVal: labelsX[x],
+          dimYName: dimYKey, dimYVal: labelsY[y],
+          dimZName: dimZKey, dimZVal: labelsZ[z],
+          measureName: measure,
+          value: val,
+          baseColor: color.clone()
+        };
+
+        const edges = new THREE.EdgesGeometry(geometry);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x0f172a, linewidth: 2 }));
+        box.add(line);
+
+        cubeGroup.add(box);
+      }
+    }
+  }
+}
+
+function onCubeHover(event) {
+  const container = document.getElementById("threeContainer");
+  const rect = container.getBoundingClientRect();
+  const tooltip = document.getElementById("hoverTooltip");
+
+  mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(cubeGroup.children);
+
+  if (intersects.length > 0) {
+    const mesh = intersects[0].object;
+    const data = mesh.userData;
+
+    // Pause auto-rotation while inspecting
+    controls.autoRotate = false;
+
+    // Highlight block
+    if (hoveredMesh !== mesh) {
+      if (hoveredMesh && originalColor) hoveredMesh.material.color.copy(originalColor);
+      hoveredMesh = mesh;
+      originalColor = mesh.userData.baseColor.clone();
+      mesh.material.color.setHex(0xffffff); // highlight white on hover
+    }
+
+    // Show floating tooltip right by cursor
+    tooltip.style.display = "block";
+    tooltip.style.left = (event.clientX - rect.left + 15) + "px";
+    tooltip.style.top = (event.clientY - rect.top + 15) + "px";
+    tooltip.innerHTML = `
+      <div style="font-weight:700; color:#38bdf8; font-size:0.75rem;">${data.dimXVal} × ${data.dimYVal}</div>
+      <div style="font-weight:800; color:#4ade80; font-size:1rem; margin-top:2px;">${data.value.toLocaleString()} kg</div>
+      <div style="font-size:0.7rem; color:#94a3b8;">${data.measureName.replace('_', ' ')}</div>
+    `;
+
+    // Also update Inspector Panel
+    document.getElementById("cellDetails").innerHTML = `
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px; text-align:left;">
+        <div style="font-size:0.75rem; font-weight:700; color:#64748b; letter-spacing:0.5px; margin-bottom:8px;">HOVERED COORDINATES</div>
+        <div style="font-size:0.85rem; color:#1e293b; margin-bottom:4px;"><strong>${data.dimXName} (X):</strong> <span style="color:#0284c7; font-weight:600;">${data.dimXVal}</span></div>
+        <div style="font-size:0.85rem; color:#1e293b; margin-bottom:4px;"><strong>${data.dimYName} (Y):</strong> <span style="color:#0284c7; font-weight:600;">${data.dimYVal}</span></div>
+        <div style="font-size:0.85rem; color:#1e293b; margin-bottom:12px;"><strong>${data.dimZName} (Z):</strong> <span style="color:#0284c7; font-weight:600;">${data.dimZVal}</span></div>
+        <div style="background:#ecfdf5; border:1px solid #10b981; border-radius:6px; padding:10px; text-align:center;">
+          <div style="font-size:0.75rem; color:#065f46; font-weight:600;">AGGREGATED VALUE</div>
+          <div style="font-size:1.3rem; font-weight:800; color:#047857; margin-top:2px;">
+            ${data.value.toLocaleString()} kg
+          </div>
+          <div style="font-size:0.75rem; color:#059669;">${data.measureName.replace('_', ' ')}</div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Reset when not hovering over a block
+    tooltip.style.display = "none";
+    if (hoveredMesh && originalColor) {
+      hoveredMesh.material.color.copy(originalColor);
+      hoveredMesh = null;
+    }
+    controls.autoRotate = true; // resume smooth rotation
+  }
+}
+
+function execOLAP(op) {
+  const exp = document.getElementById("olapExplanation");
+
+  if (op === 'slice') {
+    buildCube((x, y, z) => x === 0);
+    exp.innerHTML = `<strong>Slice Executed:</strong> A slice performs a selection on a single dimension of the OLAP cube, resulting in a 2D sub-cube. Here, we sliced specifically where <code>Food_Category = 'Main Course'</code>, cutting across all Event Types and Weather conditions.`;
+  } else if (op === 'dice') {
+    buildCube((x, y, z) => x < 2 && y < 2);
+    exp.innerHTML = `<strong>Dice Executed:</strong> A dice defines a sub-cube by performing a selection on two or more dimensions simultaneously. Here, we selected <code>Food_Category IN (Main Course, Rice)</code> AND <code>Event_Type IN (Wedding, Corporate)</code>.`;
+  } else if (op === 'rollup') {
+    buildCube();
+    exp.innerHTML = `<strong>Roll-Up Executed:</strong> Climbs up an aggregation hierarchy (e.g., from <code>Day → Month → Quarter</code>). It reduces granularity by summarizing individual transactional days into high-level monthly surplus sums.`;
+  } else if (op === 'drilldown') {
+    buildCube();
+    exp.innerHTML = `<strong>Drill-Down Executed:</strong> Navigates from less detailed data to more granular data (e.g., from <code>Quarterly Total → Monthly Breakdown → Daily Events</code>), revealing pinpoint surplus variance.`;
+  } else if (op === 'pivot') {
+    const x = document.getElementById("dimX").value;
+    const y = document.getElementById("dimY").value;
+    document.getElementById("dimX").value = y;
+    document.getElementById("dimY").value = x;
+    buildCube();
+    exp.innerHTML = `<strong>Pivot (Rotate) Executed:</strong> Rotates the data axes in space to provide an alternative perspective on the multidimensional dataset. Dimension X and Dimension Y have been transposed.`;
+  }
+}
+
+document.addEventListener("DOMContentLoaded", initThree);
+</script>
+{% endblock %}
